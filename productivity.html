@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Performance Score Distribution</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <h2>Distribution of Performance Scores</h2>
+  <svg id="chart" width="600" height="400"></svg>
+  <script>
+    d3.csv("Extended_Employee_Performance_and_Productivity_Data.csv").then(data => {
+      data.forEach(d => d.Performance_Score = +d.Performance_Score);
+
+      // Count frequencies
+      const counts = d3.rollup(
+        data,
+        v => v.length,
+        d => d.Performance_Score
+      );
+
+      const chartData = Array.from(counts, ([score, count]) => ({ score, count }));
+
+      const svg = d3.select("#chart"),
+            width = 600, height = 400,
+            margin = {top: 40, right: 20, bottom: 50, left: 60};
+
+      const x = d3.scaleBand()
+        .domain(chartData.map(d => d.score))
+        .range([margin.left, width - margin.right])
+        .padding(0.2);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(chartData, d => d.count)])
+        .nice()
+        .range([height - margin.bottom, margin.top]);
+
+      svg.selectAll("rect")
+        .data(chartData)
+        .join("rect")
+          .attr("x", d => x(d.score))
+          .attr("y", d => y(d.count))
+          .attr("height", d => y(0) - y(d.count))
+          .attr("width", x.bandwidth())
+          .attr("fill", "steelblue");
+
+      // Axes
+      svg.append("g")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x));
+
+      svg.append("g")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y));
+
+      // Labels
+      svg.append("text")
+        .attr("x", width/2).attr("y", height-10)
+        .attr("text-anchor", "middle")
+        .text("Performance Score");
+
+      svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height/2).attr("y", 15)
+        .attr("text-anchor", "middle")
+        .text("Count");
+
+      svg.append("text")
+        .attr("x", width/2).attr("y", margin.top/2)
+        .attr("text-anchor", "middle")
+        .style("font-weight", "bold")
+        .text("Distribution of Performance Scores");
+    });
+  </script>
+</body>
+</html>

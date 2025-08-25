@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sleep Duration Histogram</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <h2>Distribution of Sleep Duration</h2>
+  <svg id="chart" width="600" height="400"></svg>
+
+  <script>
+    d3.csv("Sleep_health_and_lifestyle_dataset.csv").then(data => {
+      data.forEach(d => d["Sleep Duration"] = +d["Sleep Duration"]);
+
+      const svg = d3.select("#chart"),
+            width = +svg.attr("width"),
+            height = +svg.attr("height"),
+            margin = {top:40, right:20, bottom:50, left:50};
+
+      const x = d3.scaleLinear()
+        .domain(d3.extent(data, d => d["Sleep Duration"])).nice()
+        .range([margin.left, width - margin.right]);
+
+      const bins = d3.bin().domain(x.domain()).thresholds(10)(data.map(d => d["Sleep Duration"]));
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(bins, d => d.length)]).nice()
+        .range([height - margin.bottom, margin.top]);
+
+      svg.append("g")
+        .attr("fill", "steelblue")
+        .selectAll("rect")
+        .data(bins)
+        .join("rect")
+          .attr("x", d => x(d.x0) + 1)
+          .attr("y", d => y(d.length))
+          .attr("width", d => Math.max(0, x(d.x1) - x(d.x0) - 1))
+          .attr("height", d => y(0) - y(d.length));
+
+      svg.append("g")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x));
+
+      svg.append("g")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y));
+
+      svg.append("text")
+        .attr("x", width/2).attr("y", height - 10)
+        .attr("text-anchor", "middle").text("Sleep Duration (hours)");
+
+      svg.append("text")
+        .attr("transform", "rotate(-90)").attr("x", -height/2).attr("y", 15)
+        .attr("text-anchor", "middle").text("Count");
+
+      svg.append("text")
+        .attr("x", width/2).attr("y", margin.top/2)
+        .attr("text-anchor", "middle").style("font-weight", "bold")
+        .text("Distribution of Sleep Duration");
+    });
+  </script>
+</body>
+</html>

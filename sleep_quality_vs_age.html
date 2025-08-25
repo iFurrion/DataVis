@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sleep Quality by Age</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <h2>Average Sleep Quality by Age Group</h2>
+  <svg id="chart" width="600" height="400"></svg>
+  <script>
+    d3.csv("Sleep_health_and_lifestyle_dataset.csv").then(data => {
+      data.forEach(d=>{ d["Age"]=+d["Age"]; d["Quality of Sleep"]=+d["Quality of Sleep"]; });
+      const ageGroups=d3.group(data,d=>Math.floor(d.Age/10)*10);
+      const avgByAge=Array.from(ageGroups,([age,values])=>({ageGroup:age+"-"+(age+9),avgQuality:d3.mean(values,d=>d["Quality of Sleep"])}));
+      const svg=d3.select("#chart"), width=600, height=400, margin={top:40,right:20,bottom:80,left:50};
+      const x=d3.scaleBand().domain(avgByAge.map(d=>d.ageGroup)).range([margin.left,width-margin.right]).padding(0.1);
+      const y=d3.scaleLinear().domain([0,d3.max(avgByAge,d=>d.avgQuality)]).nice().range([height-margin.bottom,margin.top]);
+      svg.append("g").selectAll("rect").data(avgByAge).join("rect")
+         .attr("x",d=>x(d.ageGroup)).attr("y",d=>y(d.avgQuality))
+         .attr("height",d=>y(0)-y(d.avgQuality)).attr("width",x.bandwidth()).attr("fill","steelblue");
+      svg.append("g").attr("transform",`translate(0,${height-margin.bottom})`).call(d3.axisBottom(x)).selectAll("text")
+         .attr("transform","rotate(-45)").style("text-anchor","end");
+      svg.append("g").attr("transform",`translate(${margin.left},0)`).call(d3.axisLeft(y));
+      svg.append("text").attr("x",width/2).attr("y",height-20).attr("text-anchor","middle").text("Age Group");
+      svg.append("text").attr("transform","rotate(-90)").attr("x",-height/2).attr("y",15).attr("text-anchor","middle").text("Average Sleep Quality");
+      svg.append("text").attr("x",width/2).attr("y",margin.top/2).attr("text-anchor","middle").style("font-weight","bold").text("Average Sleep Quality by Age");
+    });
+  </script>
+</body>
+</html>
