@@ -2,26 +2,68 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Tasks vs Efficiency</title>
+  <title>Tasks Completed vs Work Efficiency</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
   <h2>Tasks Completed vs Work Efficiency</h2>
   <svg id="chart" width="600" height="400"></svg>
   <script>
-    d3.csv("Extended_Employee_Performance_and_Productivity_Data.csv").then(data=>{
-      data.forEach(d=>{ d["Tasks_Completed"]=+d["Tasks_Completed"]; d["Work_Efficiency"]=+d["Work_Efficiency"]; });
-      const svg=d3.select("#chart"), width=600, height=400, margin={top:40,right:20,bottom:50,left:50};
-      const x=d3.scaleLinear().domain(d3.extent(data,d=>d["Tasks_Completed"])).nice().range([margin.left,width-margin.right]);
-      const y=d3.scaleLinear().domain(d3.extent(data,d=>d["Work_Efficiency"])).nice().range([height-margin.bottom,margin.top]);
-      svg.append("g").attr("transform",`translate(0,${height-margin.bottom})`).call(d3.axisBottom(x));
-      svg.append("g").attr("transform",`translate(${margin.left},0)`).call(d3.axisLeft(y));
-      svg.append("g").selectAll("circle").data(data).join("circle")
-         .attr("cx",d=>x(d["Tasks_Completed"])).attr("cy",d=>y(d["Work_Efficiency"]))
-         .attr("r",3).attr("fill","steelblue").attr("opacity",0.7);
-      svg.append("text").attr("x",width/2).attr("y",height-10).attr("text-anchor","middle").text("Tasks_Completed");
-      svg.append("text").attr("transform","rotate(-90)").attr("x",-height/2).attr("y",15).attr("text-anchor","middle").text("Work_Efficiency");
-      svg.append("text").attr("x",width/2).attr("y",margin.top/2).attr("text-anchor","middle").style("font-weight","bold").text("Tasks Completed vs Work Efficiency");
+    d3.csv("Extended_Employee_Performance_and_Productivity_Data.csv").then(data => {
+      data.forEach(d => {
+        d.Projects_Handled = +d.Projects_Handled;        // proxy for tasks completed
+        d.Work_Hours_Per_Week = +d.Work_Hours_Per_Week;  // proxy for efficiency
+      });
+
+      const svg = d3.select("#chart"),
+            width = 600, height = 400,
+            margin = {top: 40, right: 20, bottom: 50, left: 60};
+
+      const x = d3.scaleLinear()
+        .domain(d3.extent(data, d => d.Projects_Handled)).nice()
+        .range([margin.left, width - margin.right]);
+
+      const y = d3.scaleLinear()
+        .domain(d3.extent(data, d => d.Work_Hours_Per_Week)).nice()
+        .range([height - margin.bottom, margin.top]);
+
+      // Draw points
+      svg.append("g")
+        .selectAll("circle")
+        .data(data)
+        .join("circle")
+          .attr("cx", d => x(d.Projects_Handled))
+          .attr("cy", d => y(d.Work_Hours_Per_Week))
+          .attr("r", 3)
+          .attr("fill", "steelblue")
+          .attr("opacity", 0.7);
+
+      // Axes
+      svg.append("g")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x));
+
+      svg.append("g")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y));
+
+      // Labels
+      svg.append("text")
+        .attr("x", width/2).attr("y", height-10)
+        .attr("text-anchor", "middle")
+        .text("Projects Handled (proxy for Tasks Completed)");
+
+      svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height/2).attr("y", 15)
+        .attr("text-anchor", "middle")
+        .text("Work Hours per Week (proxy for Efficiency)");
+
+      svg.append("text")
+        .attr("x", width/2).attr("y", margin.top/2)
+        .attr("text-anchor", "middle")
+        .style("font-weight", "bold")
+        .text("Tasks Completed vs Work Efficiency");
     });
   </script>
 </body>
