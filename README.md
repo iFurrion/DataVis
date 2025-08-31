@@ -37,4 +37,4 @@ http://localhost:8000
 
 7. The data should be displayed on the screen
 
-### This project has been tested on opera, a chromium based browser. Therefore any other chromium based browser should also work. However, Firefox and Safari was never tested. There is no reason for these two browsers to cause a problem.
+### This project has been tested on opera, a chromium based browser. Therefore any other chromium based browser should also work. However, Firefox and Safari were never tested. There is no reason for these two browsers to cause a problem.
