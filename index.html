@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sleep Quality vs Work Performance</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 20px; background: #f7f8fa; }
+    svg { border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); background: #fff; border: none; }
+    .tooltip {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #bbb;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      padding: 8px 12px;
+      font-size: 13px;
+      pointer-events: none;
+      color: #222;
+      z-index: 10;
+      transition: opacity 0.2s;
+    }
+    .annotation { font-size: 13px; fill: #b22222; text-anchor: end; }
+    #controls { margin-bottom: 18px; background: #f0f4f8; padding: 10px 16px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: flex; align-items: center; gap: 12px; }
+    label { margin-right: 10px; font-weight: 500; }
+    input[type=range] { accent-color: #000000; height: 4px; }
+    #minLabel, #maxLabel { font-weight: bold; color: #000000; margin: 0 4px; }
+    .error-msg {
+      color: #b22222;
+      font-weight: bold;
+      margin-top: 20px;
+      background: #fff0f0;
+      border: 1px solid #f5c2c7;
+      border-radius: 6px;
+      padding: 8px 12px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Average Work Performance by Sleep Quality</h1>
+  <p>
+    This chart shows the <b>mean Work Performance Score</b> for each 
+    <b>Sleep Quality</b> level (1–9). Bubble size reflects how many people 
+    are in each group, bubble color encodes the average <b>Stress Level</b>,
+    and error bars show ±1 standard deviation of performance.
+  </p>
+
+  <div id="controls" style="display:none;">
+    <label>Sleep Quality Range:</label>
+    <input type="range" id="minQuality" min="1" max="9" value="1"> 
+    <span id="minLabel">1</span>
+    –
+    <input type="range" id="maxQuality" min="1" max="9" value="9"> 
+    <span id="maxLabel">9</span>
+  </div>
+
+  <svg id="chart" width="800" height="500"></svg>
+  <div class="tooltip" style="display:none;"></div>
+  <div id="error" class="error-msg"></div>
+
+  <script>
+  (function(){
+    // Basic browser compatibility check though I believe this is unnecessary
+    if (!window.fetch || !window.Promise) {
+      document.getElementById("error").textContent =
+        "Your browser is too old for this visualization. Please update to a modern browser.";
+      return;
+    }
+
+    const width = 800, height = 500, margin = {top:40,right:40,bottom:60,left:60};
+    const svg = d3.select("#chart")
+                  .attr("viewBox",[0,0,width,height])
+                  .attr("preserveAspectRatio","xMidYMid meet");
+
+    const tooltip = d3.select(".tooltip");
+
+    // Robust CSV load
+    d3.csv("joined_for_d3.csv").then(raw => {
+      if (!raw || !raw.length) {
+        throw new Error("CSV loaded but empty or missing rows.");
+      }
+
+      // Data prep
+      raw.forEach((d,i) => {
+        try {
+          d["Quality of Sleep"] = +d["Quality of Sleep"];
+          d["Performance_Score"] = +d["Performance_Score"];
+          d["Stress Level"] = +d["Stress Level"];
+
+          if (isNaN(d["Quality of Sleep"]) || isNaN(d["Performance_Score"])) {
+            console.warn(`Row ${i} has invalid data:`, d);
+          }
+        } catch (e) {
+          console.error("Error parsing row", i, e);
+        }
+      });
+
+      // Filter out bad rows
+      const clean = raw.filter(d => 
+        !isNaN(d["Quality of Sleep"]) &&
+        !isNaN(d["Performance_Score"]) &&
+        !isNaN(d["Stress Level"])
+      );
+
+      if (!clean.length) {
+        throw new Error("No valid data found in CSV after cleaning.");
+      }
+
+      // Group by sleep quality (mean, stddev, stress, count)
+      const grouped = d3.rollups(
+        clean,
+        v => {
+          const meanPerf = d3.mean(v, d => d["Performance_Score"]);
+          const stdPerf = d3.deviation(v, d => d["Performance_Score"]);
+          return {
+            meanPerf,
+            stdPerf,
+            meanStress: d3.mean(v, d => d["Stress Level"]),
+            count: v.length
+          };
+        },
+        d => d["Quality of Sleep"]
+      ).map(([quality, stats]) => ({
+        quality: +quality,
+        ...stats
+      }));
+
+      grouped.sort((a,b) => d3.ascending(a.quality, b.quality));
+
+      // --- Scales ---
+      const x = d3.scaleLinear()
+        .domain([1,9])
+        .range([margin.left, width - margin.right]);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(grouped, d => d.meanPerf + (d.stdPerf||0))]).nice()
+        .range([height - margin.bottom, margin.top]);
+
+      // Use a more modern color palette
+      const color = d3.scaleSequential()
+        .domain(d3.extent(grouped, d => d.meanStress))
+        .interpolator(d3.interpolateViridis);
+
+      const size = d3.scaleSqrt()
+        .domain([0, d3.max(grouped, d => d.count)])
+        .range([4,20]);
+
+      // --- Axes ---
+      // Add gridlines for readability
+      svg.append("g")
+        .attr("class","grid")
+        .attr("transform",`translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(9).tickSize(-height + margin.top + margin.bottom).tickFormat(""));
+      svg.append("g")
+        .attr("class","grid")
+        .attr("transform",`translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(8).tickSize(-width + margin.left + margin.right).tickFormat(""));
+
+      svg.selectAll(".grid line")
+        .attr("stroke", "#e0e6ef")
+        .attr("stroke-dasharray", "2,2");
+
+      svg.append("g")
+        .attr("class","x-axis")
+        .attr("transform",`translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(9).tickFormat(d3.format("d")))
+        .call(g => g.selectAll(".domain").attr("stroke", "#4f8cff"))
+        .call(g => g.selectAll(".tick text").attr("font-size",13).attr("fill", "#222"));
+
+      svg.append("g")
+        .attr("class","y-axis")
+        .attr("transform",`translate(${margin.left},0)`)
+        .call(d3.axisLeft(y))
+        .call(g => g.selectAll(".domain").attr("stroke", "#4f8cff"))
+        .call(g => g.selectAll(".tick text").attr("font-size",13).attr("fill", "#222"));
+
+      // Axis labels
+      svg.append("text")
+        .attr("x", width/2)
+        .attr("y", height - 15)
+        .attr("text-anchor","middle")
+        .attr("font-size", "16px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#4f8cff")
+        .text("Sleep Quality (1–9)");
+
+      svg.append("text")
+        .attr("transform","rotate(-90)")
+        .attr("x", -height/2)
+        .attr("y", 22)
+        .attr("text-anchor","middle")
+        .attr("font-size", "16px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#4f8cff")
+        .text("Average Work Performance Score");
+
+      // const to contain chart elements
+      const chartGroup = svg.append("g").attr("class","chart-body");
+
+      function update(minQ, maxQ) {
+        const filtered = grouped.filter(d => d.quality >= minQ && d.quality <= maxQ);
+
+        // Bubbles
+        const circles = chartGroup.selectAll("circle")
+          .data(filtered, d => d.quality);
+
+        circles.enter().append("circle")
+          .attr("cx", d => x(d.quality))
+          .attr("cy", d => y(d.meanPerf))
+          .attr("r", 0)
+          .attr("fill", d => color(d.meanStress))
+          .attr("opacity",0.85)
+          .style("filter", "drop-shadow(0 2px 6px rgba(0,0,0,0.10))")
+          .merge(circles)
+          .transition().duration(600)
+          .attr("cx", d => x(d.quality))
+          .attr("cy", d => y(d.meanPerf))
+          .attr("r", d => size(d.count))
+          .attr("fill", d => color(d.meanStress));
+
+        chartGroup.selectAll("circle")
+          .on("mouseover",(event,d)=>{
+            tooltip.style("display","block")
+                   .style("opacity",1)
+                   .html(
+                     `<b>Sleep Quality:</b> ${d.quality}<br>
+                      <b>Avg Performance:</b> ${d.meanPerf.toFixed(2)}<br>
+                      <b>StdDev:</b> ${d.stdPerf ? d.stdPerf.toFixed(2) : "–"}<br>
+                      <b>Avg Stress:</b> ${d.meanStress.toFixed(2)}<br>
+                      <b>Count:</b> ${d.count}`
+                   );
+          })
+          .on("mousemove",(event)=>{
+            tooltip.style("left",(event.pageX+10)+"px")
+                   .style("top",(event.pageY-30)+"px");
+          })
+          .on("mouseout",()=>tooltip.style("opacity",0).style("display","none"));
+
+        circles.exit().transition().duration(400).attr("r",0).remove();
+
+        // Error bars
+        const bars = chartGroup.selectAll("line.error")
+          .data(filtered, d => d.quality);
+
+        bars.enter().append("line")
+          .attr("class","error")
+          .attr("x1", d => x(d.quality))
+          .attr("x2", d => x(d.quality))
+          .attr("y1", d => y(d.meanPerf))
+          .attr("y2", d => y(d.meanPerf))
+          .attr("stroke","#4f8cff")
+          .attr("stroke-width",2)
+          .attr("opacity",0.7)
+          .merge(bars)
+          .transition().duration(600)
+          .attr("x1", d => x(d.quality))
+          .attr("x2", d => x(d.quality))
+          .attr("y1", d => y(d.meanPerf - (d.stdPerf||0)))
+          .attr("y2", d => y(d.meanPerf + (d.stdPerf||0)))
+          .attr("stroke","#4f8cff")
+          .attr("stroke-width",2)
+          .attr("opacity",0.7);
+
+        bars.exit().transition().duration(400).attr("y1", d => y(d.meanPerf)).attr("y2", d => y(d.meanPerf)).remove();
+      }
+
+      // Initial draw to display all data
+      update(1,9);
+
+      // Show controls after successful data load
+      document.getElementById("controls").style.display = "block";
+
+      // Sliders for filter
+      const minSlider = d3.select("#minQuality");
+      const maxSlider = d3.select("#maxQuality");
+      const minLabel = d3.select("#minLabel");
+      const maxLabel = d3.select("#maxLabel");
+
+      function applyFilter() {
+        let minQ = +minSlider.node().value;
+        let maxQ = +maxSlider.node().value;
+        if (minQ > maxQ) [minQ,maxQ] = [maxQ,minQ];
+        minLabel.text(minQ);
+        maxLabel.text(maxQ);
+        update(minQ,maxQ);
+      }
+
+      minSlider.on("input", applyFilter);
+      maxSlider.on("input", applyFilter);
+
+    }).catch(err => {
+      console.error("Error loading or processing data:", err);
+      document.getElementById("error").textContent =
+        "Failed to load or process the dataset. Please check if the file is named correctly or if it exists at all.";
+    });
+  })();
+  </script>
+</body>
+</html>
