@@ -18,7 +18,10 @@ To view and interact with the visualization locally, follow these steps:
 2. **Open a terminal** in the directory containing these files.
 
 3. **Start a simple HTTP server** using Python:
-
+   ```bash
+   cd [PROJECT LOCATION]
+   ```
+   Where [PROJECT LOCATION] should be replaced with the path you have downloaded the project into.
    ```bash
    python -m http.server
    ```
