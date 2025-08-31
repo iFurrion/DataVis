@@ -4,28 +4,154 @@
   <meta charset="UTF-8">
   <title>Sleep vs Stress</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f7f9fa;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h2 {
+      margin-top: 32px;
+      color: #2c3e50;
+    }
+    #chart {
+      box-shadow: 0 2px 12px rgba(44,62,80,0.08);
+      background: #fff;
+      border-radius: 12px;
+      margin-bottom: 24px;
+    }
+    .axis-label {
+      font-size: 16px;
+      fill: #34495e;
+    }
+    .grid line {
+      stroke: #e0e0e0;
+      stroke-opacity: 0.7;
+      shape-rendering: crispEdges;
+    }
+    .tooltip {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #b2bec3;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 14px;
+      color: #2d3436;
+      pointer-events: none;
+      box-shadow: 0 2px 8px rgba(44,62,80,0.12);
+      z-index: 10;
+    }
+  </style>
 </head>
 <body>
   <h2>Sleep Duration vs Stress Level</h2>
-  <svg id="chart" width="600" height="400"></svg>
+  <svg id="chart" width="700" height="440"></svg>
+  <div id="tooltip" class="tooltip" style="display:none;"></div>
   <script>
     d3.csv("Sleep_health_and_lifestyle_dataset.csv").then(data => {
-      data.forEach(d => { d["Sleep Duration"]=+d["Sleep Duration"]; d["Stress Level"]=+d["Stress Level"]; });
-      const svg=d3.select("#chart"), width=600, height=400, margin={top:40,right:20,bottom:50,left:50};
-      const x=d3.scaleLinear().domain(d3.extent(data,d=>d["Sleep Duration"])).nice().range([margin.left,width-margin.right]);
-      const y=d3.scaleLinear().domain(d3.extent(data,d=>d["Stress Level"])).nice().range([height-margin.bottom,margin.top]);
-      svg.append("g").attr("transform",`translate(0,${height-margin.bottom})`).call(d3.axisBottom(x));
-      svg.append("g").attr("transform",`translate(${margin.left},0)`).call(d3.axisLeft(y));
-      svg.append("g").selectAll("circle").data(data).join("circle")
-         .attr("cx",d=>x(d["Sleep Duration"])).attr("cy",d=>y(d["Stress Level"]))
-         .attr("cx", d => x(d["Sleep Duration"]) + (Math.random() - 0.5) * 5) // jitter x
-        .attr("cy", d => y(d["Stress Level"]) + (Math.random() - 0.5) * 5)  // jitter y
-        .attr("opacity", 0.6)
-        .attr("r",3).attr("fill","steelblue").attr("opacity",0.7);
-      svg.append("text").attr("x",width/2).attr("y",height-10).attr("text-anchor","middle").text("Sleep Duration (hours)");
-      svg.append("text").attr("transform","rotate(-90)").attr("x",-height/2).attr("y",15).attr("text-anchor","middle").text("Stress Level");
-      svg.append("text").attr("x",width/2).attr("y",margin.top/2).attr("text-anchor","middle").style("font-weight","bold").text("Sleep vs Stress");
-      
+      data.forEach(d => {
+        d["Sleep Duration"] = +d["Sleep Duration"];
+        d["Stress Level"] = +d["Stress Level"];
+      });
+
+      // Group by sleep duration and calculate mean stress level
+      const meanData = Array.from(
+        d3.group(data, d => d["Sleep Duration"]),
+        ([sleepDuration, group]) => ({
+          "Sleep Duration": sleepDuration,
+          "Mean Stress Level": d3.mean(group, d => d["Stress Level"])
+        })
+      );
+
+      const svg = d3.select("#chart"), width = 700, height = 440, margin = {top: 60, right: 30, bottom: 60, left: 70};
+      const x = d3.scaleLinear().domain(d3.extent(meanData, d => d["Sleep Duration"])).nice().range([margin.left, width - margin.right]);
+      const y = d3.scaleLinear().domain(d3.extent(meanData, d => d["Mean Stress Level"])).nice().range([height - margin.bottom, margin.top]);
+
+      // Gridlines
+      function make_x_gridlines() { return d3.axisBottom(x).ticks(8); }
+      function make_y_gridlines() { return d3.axisLeft(y).ticks(8); }
+      svg.append("g")
+        .attr("class", "grid")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(make_x_gridlines()
+          .tickSize(-height + margin.top + margin.bottom)
+          .tickFormat("")
+        );
+      svg.append("g")
+        .attr("class", "grid")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(make_y_gridlines()
+          .tickSize(-width + margin.left + margin.right)
+          .tickFormat("")
+        );
+
+      // Axes
+      svg.append("g")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x).ticks(8))
+        .selectAll("text")
+        .style("font-size", "14px");
+      svg.append("g")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(8))
+        .selectAll("text")
+        .style("font-size", "14px");
+
+      // Axis labels
+      svg.append("text")
+        .attr("class", "axis-label")
+        .attr("x", width / 2)
+        .attr("y", height - 20)
+        .attr("text-anchor", "middle")
+        .text("Sleep Duration (hours)");
+      svg.append("text")
+        .attr("class", "axis-label")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height / 2)
+        .attr("y", 28)
+        .attr("text-anchor", "middle")
+        .text("Mean Stress Level");
+
+      // Title
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", margin.top / 2)
+        .attr("text-anchor", "middle")
+        .style("font-size", "22px")
+        .style("font-weight", "bold")
+        .style("fill", "#2c3e50")
+        .text("Sleep Duration vs Mean Stress Level");
+
+      // Tooltip
+      const tooltip = d3.select("#tooltip");
+
+      // Points (means)
+      svg.append("g")
+        .selectAll("circle")
+        .data(meanData)
+        .join("circle")
+        .attr("cx", d => x(d["Sleep Duration"]))
+        .attr("cy", d => y(d["Mean Stress Level"]))
+        .attr("r", 7)
+        .attr("fill", "#27ae60")
+        .attr("opacity", 0.85)
+        .attr("stroke", "#145a32")
+        .attr("stroke-width", 2)
+        .on("mouseover", function(event, d) {
+          d3.select(this).attr("fill", "#e67e22");
+          tooltip.style("display", "block")
+            .style("left", (event.pageX + 12) + "px")
+            .style("top", (event.pageY - 18) + "px")
+            .html(`<strong>Sleep Duration:</strong> ${d["Sleep Duration"]} hrs<br><strong>Mean Stress Level:</strong> ${d["Mean Stress Level"].toFixed(2)}`);
+        })
+        .on("mouseout", function() {
+          d3.select(this).attr("fill", "#27ae60");
+          tooltip.style("display", "none");
+        });
     });
   </script>
 </body>

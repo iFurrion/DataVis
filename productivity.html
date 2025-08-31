@@ -4,6 +4,38 @@
   <meta charset="UTF-8">
   <title>Performance Score Distribution</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f7f9fc;
+      margin: 0;
+      padding: 0;
+    }
+    h2 {
+      text-align: center;
+      color: #2c3e50;
+      margin-top: 30px;
+    }
+    #chart {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(44,62,80,0.08);
+      display: block;
+      margin: 30px auto 0 auto;
+    }
+    .axis text {
+      font-size: 14px;
+      fill: #34495e;
+    }
+    .axis path, .axis line {
+      stroke: #bdc3c7;
+    }
+    .bar-label {
+      font-size: 13px;
+      fill: #2c3e50;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
   <h2>Distribution of Performance Scores</h2>
@@ -12,62 +44,91 @@
     d3.csv("Extended_Employee_Performance_and_Productivity_Data.csv").then(data => {
       data.forEach(d => d.Performance_Score = +d.Performance_Score);
 
-      // Count frequencies
       const counts = d3.rollup(
         data,
         v => v.length,
         d => d.Performance_Score
       );
-
-      const chartData = Array.from(counts, ([score, count]) => ({ score, count }));
+      const chartData = Array.from(counts, ([score, count]) => ({ score, count })).sort((a,b) => a.score-b.score);
 
       const svg = d3.select("#chart"),
             width = 600, height = 400,
-            margin = {top: 40, right: 20, bottom: 50, left: 60};
+            margin = {top: 60, right: 30, bottom: 60, left: 70};
 
       const x = d3.scaleBand()
         .domain(chartData.map(d => d.score))
         .range([margin.left, width - margin.right])
-        .padding(0.2);
+        .padding(0.25);
 
       const y = d3.scaleLinear()
-        .domain([0, d3.max(chartData, d => d.count)])
-        .nice()
+        .domain([0, d3.max(chartData, d => d.count)]).nice()
         .range([height - margin.bottom, margin.top]);
 
+      // Bars with animation
       svg.selectAll("rect")
         .data(chartData)
         .join("rect")
           .attr("x", d => x(d.score))
-          .attr("y", d => y(d.count))
-          .attr("height", d => y(0) - y(d.count))
+          .attr("y", y(0))
+          .attr("height", 0)
           .attr("width", x.bandwidth())
-          .attr("fill", "steelblue");
+          .attr("rx", 8)
+          .attr("fill", "#3498db")
+        .transition()
+          .duration(900)
+          .attr("y", d => y(d.count))
+          .attr("height", d => y(0) - y(d.count));
+
+      // Value labels above bars
+      svg.selectAll(".bar-label")
+        .data(chartData)
+        .join("text")
+          .attr("class", "bar-label")
+          .attr("x", d => x(d.score) + x.bandwidth()/2)
+          .attr("y", d => y(d.count) - 8)
+          .attr("text-anchor", "middle")
+          .text(d => d.count);
 
       // Axes
       svg.append("g")
+        .attr("class", "axis")
         .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(d3.axisBottom(x));
+        .call(d3.axisBottom(x))
+        .selectAll("text")
+          .attr("dy", "1em")
+          .attr("font-weight", "bold");
 
       svg.append("g")
+        .attr("class", "axis")
         .attr("transform", `translate(${margin.left},0)`)
         .call(d3.axisLeft(y));
 
-      // Labels
+      // X axis label
       svg.append("text")
-        .attr("x", width/2).attr("y", height-10)
+        .attr("x", width/2)
+        .attr("y", height - 20)
         .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#2c3e50")
         .text("Performance Score");
 
+      // Y axis label
       svg.append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("x", -height/2).attr("y", 15)
-        .attr("text-anchor", "middle")
-        .text("Count");
+  .attr("transform", "rotate(-90)")
+  .attr("x", -height/2)
+  .attr("y", 10) 
+  .attr("text-anchor", "middle")
+  .attr("font-size", "16px")
+  .attr("fill", "#2c3e50")
+  .text("Count");
 
+      // Chart title
       svg.append("text")
-        .attr("x", width/2).attr("y", margin.top/2)
+        .attr("x", width/2)
+        .attr("y", margin.top/2)
         .attr("text-anchor", "middle")
+        .attr("font-size", "22px")
+        .attr("fill", "#34495e")
         .style("font-weight", "bold")
         .text("Distribution of Performance Scores");
     });
